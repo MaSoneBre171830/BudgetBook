@@ -1,0 +1,82 @@
+﻿@page "/transactions/edit/{Id:int}"
+@attribute [Authorize]
+@inject ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+
+<h3>Edit</h3>
+
+@if (transaction == null)
+{
+	<p>Not loaded @Id</p>
+}
+else
+{
+	<EditForm Model="transaction" OnValidSubmit="UpdateTransaction">
+		<DataAnnotationsValidator />
+		<ValidationSummary />
+
+		<label>Description</label>
+		<InputText @bind-Value="transaction.Description"></InputText>
+		<label>Amount</label>
+		<InputNumber @bind-Value="transaction.Amount"></InputNumber>
+		<label>Booking Date</label>
+		<InputDate @bind-Value="transaction.BookingDate"></InputDate>
+		<label>Type</label>
+		<InputSelect @bind-Value="transaction.Type">
+			<option value="Income">Income</option>
+			<option value="Expense">Expense</option>
+		</InputSelect>
+		<InputSelect @bind-Value="transaction.CategoryId">
+			@foreach (var category in categories)
+			{
+				<option value="@category.Id">@category.Name</option>
+			}
+		</InputSelect>
+		<button type="submit">Save</button>
+	</EditForm>
+}
+
+@code {
+	[Parameter]
+	public int Id { get; set; }
+
+	private Transaction? transaction;
+	private List<Category> categories = new();
+
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+		var user = authState.User;
+		var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+		if (userId == null)
+			return;
+
+		transaction = await DbContext.Transactions
+		.FirstOrDefaultAsync(t => t.Id == Id && t.UserId == userId);
+
+		if (transaction == null)
+			return;
+
+		categories = await DbContext.Categories
+		.Where(c => c.IsActive)
+		.OrderBy(c => c.Name)
+		.ToListAsync();
+
+	}
+
+	private async Task UpdateTransaction()
+	{
+		var category = await DbContext.Categories.FirstOrDefaultAsync(c => c.Id == transaction.CategoryId);
+
+	if (category == null || !category.IsActive || category.Type != transaction.Type)
+			return;
+
+		await DbContext.SaveChangesAsync();
+
+		NavigationManager.NavigateTo("/transactions");
+	}
+
+}

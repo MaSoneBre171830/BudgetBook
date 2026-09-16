@@ -1,0 +1,119 @@
+﻿@page "/transactions"
+@attribute [Authorize]
+
+@inject Data.ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+
+
+<h3>My Transactions</h3>
+
+<table>
+	<thead>
+		<tr>
+			<th>Date </th>
+			<th>Description </th>
+			<th>Category </th>
+			<th>Type </th>
+			<th>Amount </th
+			<th>Actions</th>
+		</tr>
+	</thead>
+
+	<tbody>
+		
+			@foreach(var transaction in transactions)
+			{
+				<tr>
+				<td>@transaction.BookingDate.ToString("dd.MM.yyyy")</td>
+				<td>@transaction.Description </td>
+				<td>@transaction.Category.Name </td>
+				<td>@transaction.Type </td>
+				<td>@transaction.Amount </td>
+				<td > <a href="/transactions/edit/@transaction.Id"><button class="button">Edit</button></a></td>
+				<td > <button @onclick="() => transactionToDelete = transaction" class="button">Delete</button></td>
+				<td > <a href="/transactions/details/@transaction.Id"><button class="button">Details</button></a></td>
+				</tr>
+			}	
+			
+	</tbody>
+</table>
+
+@if(transactionToDelete != null)
+{
+	
+}@if (transactionToDelete != null)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete Transaction</h5>
+                </div>
+
+                <div class="modal-body">
+                    <p>
+                        Are you sure you want to delete
+                        <strong>@transactionToDelete.Description</strong>
+                    </p>
+                </div>
+
+                <div class="modal-footer">
+                    <button @onclick="DeleteTransaction">Delete</button>
+					<button @onclick="() => transactionToDelete = null">Cancel</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+
+	private Transaction? transactionToDelete;
+	List<Transaction> transactions = new();
+	private string? userId;
+
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+		var user = authState.User;
+		userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+		if (userId == null)
+			return;
+
+		transactions = await DbContext.Transactions
+		.Where(t => t.UserId == userId)
+		.Include(t => t.Category)
+		.OrderByDescending(t => t.BookingDate)
+		.ToListAsync();
+
+	}
+
+	private async Task DeleteTransaction()
+	{
+		
+
+		if (transactionToDelete == null || userId != transactionToDelete.UserId)
+			return;
+
+		
+		 var transaction = await DbContext.Transactions
+        .FirstOrDefaultAsync(t =>
+            t.Id == transactionToDelete.Id &&
+            t.UserId == userId);
+
+		if (transaction == null)
+			return;
+
+
+		DbContext.Transactions.Remove(transactionToDelete);
+		await DbContext.SaveChangesAsync();
+
+		transactions.Remove(transactionToDelete);
+		transactionToDelete = null;
+	}
+
+}

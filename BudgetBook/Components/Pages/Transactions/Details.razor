@@ -1,0 +1,52 @@
+﻿@page "/transactions/details/{Id:int}"
+@attribute [Authorize]
+@inject ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+
+<h3>Details</h3>
+
+@if (transaction == null)
+{
+	<p>Transaction not found.</p>
+}
+else
+{
+	<div>
+		<p><strong>Date:</strong> @transaction.BookingDate.ToString("dd.MM.yyyy")</p>
+		<p><strong>Description:</strong> @transaction.Description</p>
+		<p><strong>Category:</strong> @transaction.Category.Name</p>
+		<p><strong>Type:</strong> @transaction.Type</p>
+		<p><strong>Amount:</strong> @transaction.Amount</p>
+		<p><strong>Created:</strong> @transaction.CreatedAt.ToString("dd.MM.yyyy HH:mm")</p>
+		<a href="/transactions"><button class="button" >Back</button></a>
+	</div>
+}
+
+
+
+@code {
+	[Parameter]
+	public int Id { get; set; }
+	private Transaction? transaction;
+
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+		var user = authState.User;
+		var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+		if (userId == null)
+			return;
+
+		transaction = await DbContext.Transactions
+		.Include(t => t.Category)
+		.FirstOrDefaultAsync(t => t.Id == Id && t.UserId == userId);
+		
+
+		if (transaction == null)
+			return;
+
+	}
+}

@@ -1,0 +1,98 @@
+﻿@page "/transactions/create"
+@attribute [Authorize]
+@inject ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<h3>Create Transaction</h3>
+
+<EditForm Model="transaction" OnValidSubmit="CreateTransaction">
+	<DataAnnotationsValidator />
+	<ValidationSummary />
+
+	<label> Description</label>
+	<InputText @bind-Value="transaction.Description"  />
+	<label> Amount</label>
+	<InputNumber @bind-Value="transaction.Amount"  />
+	<label> Booking Date</label>
+	<InputDate @bind-Value="transaction.BookingDate"  />
+	<label> Type</label>
+	<InputSelect @bind-Value="transaction.Type">
+		<option value="Income">Income</option>
+		<option value="Expense">Expense</option>
+	</InputSelect>
+	<InputSelect @bind-Value="transaction.CategoryId">
+		<option value="">Select Category</option>
+		@foreach (var category in categories)
+		{
+			<option value="@category.Id">@category.Name</option>
+		}
+	</InputSelect>
+
+	<button type="submit">Create</button>
+</EditForm>
+
+@if (errorMessage != null)
+{
+	<p class="text-danger">@errorMessage</p>
+}
+
+@code {
+	private Transaction transaction = new()
+	{
+		BookingDate = DateTime.Today
+	};
+	private List<Category> categories = new();
+	private string? errorMessage;
+	protected override async Task OnInitializedAsync()
+	{
+		categories = await DbContext.Categories
+		.Where(c => c.IsActive)
+		.OrderBy(c => c.Name)
+		.ToListAsync();
+	}
+
+	private async Task CreateTransaction()
+	{
+		var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+		var user = authState.User;
+		var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+		if (userId == null)
+			return;
+
+		var category = await DbContext.Categories
+		.FirstOrDefaultAsync(c => c.Id == transaction.CategoryId);
+
+		if (category == null || !category.IsActive)
+		{
+			errorMessage = "Please select a valid category.";
+			return;
+		}
+
+		if (category.Type != transaction.Type)
+		{
+			errorMessage = "The selected category does not match the transaction type.";
+			return;
+		}
+
+		if (transaction.BookingDate == DateTime.MinValue)
+		{
+			errorMessage = "Please select a valid booking date.";
+			return;
+		}
+
+		if (transaction.BookingDate.Date > DateTime.Today)
+		{
+			errorMessage = "Booking date cannot be in the future.";
+			return;
+		}
+
+		transaction.UserId = userId;
+		DbContext.Transactions.Add(transaction);
+		await DbContext.SaveChangesAsync();
+
+		NavigationManager.NavigateTo("/transactions");
+	}
+
+}
