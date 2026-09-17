@@ -6,22 +6,22 @@
 
 <h3>Create Transaction</h3>
 
-<EditForm Model="transaction" OnValidSubmit="CreateTransaction">
+<EditForm Model="model" OnValidSubmit="CreateTransaction">
 	<DataAnnotationsValidator />
 	<ValidationSummary />
 
 	<label> Description</label>
-	<InputText @bind-Value="transaction.Description"  />
+	<InputText @bind-Value="model.Description"  />
 	<label> Amount</label>
-	<InputNumber @bind-Value="transaction.Amount"  />
+	<InputNumber @bind-Value="model.Amount"  />
 	<label> Booking Date</label>
-	<InputDate @bind-Value="transaction.BookingDate"  />
+	<InputDate @bind-Value="model.BookingDate"  />
 	<label> Type</label>
-	<InputSelect @bind-Value="transaction.Type">
+	<InputSelect @bind-Value="model.Type">
 		<option value="Income">Income</option>
 		<option value="Expense">Expense</option>
 	</InputSelect>
-	<InputSelect @bind-Value="transaction.CategoryId">
+	<InputSelect @bind-Value="model.CategoryId">
 		<option value="">Select Category</option>
 		@foreach (var category in categories)
 		{
@@ -38,10 +38,7 @@
 }
 
 @code {
-	private Transaction transaction = new()
-	{
-		BookingDate = DateTime.Today
-	};
+	private TransactionFormViewModel model = new();
 	private List<Category> categories = new();
 	private string? errorMessage;
 	protected override async Task OnInitializedAsync()
@@ -62,7 +59,7 @@
 			return;
 
 		var category = await DbContext.Categories
-		.FirstOrDefaultAsync(c => c.Id == transaction.CategoryId);
+		.FirstOrDefaultAsync(c => c.Id == model.CategoryId);
 
 		if (category == null || !category.IsActive)
 		{
@@ -70,25 +67,35 @@
 			return;
 		}
 
-		if (category.Type != transaction.Type)
+		if (category.Type != model.Type)
 		{
 			errorMessage = "The selected category does not match the transaction type.";
 			return;
 		}
 
-		if (transaction.BookingDate == DateTime.MinValue)
+		if (model.BookingDate == DateTime.MinValue)
 		{
 			errorMessage = "Please select a valid booking date.";
 			return;
 		}
 
-		if (transaction.BookingDate.Date > DateTime.Today)
+		if (model.BookingDate.Date > DateTime.Today)
 		{
 			errorMessage = "Booking date cannot be in the future.";
 			return;
 		}
 
-		transaction.UserId = userId;
+		var transaction = new Transaction
+			{
+				Description = model.Description,
+				Amount = model.Amount,
+				BookingDate = model.BookingDate,
+				Type = model.Type,
+				CategoryId = model.CategoryId,
+				UserId = userId
+			};
+
+
 		DbContext.Transactions.Add(transaction);
 		await DbContext.SaveChangesAsync();
 

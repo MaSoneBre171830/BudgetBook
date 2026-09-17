@@ -46,7 +46,9 @@ else
 		
 
 		if (transaction == null)
+		{
+			NavigationManager.NavigateTo("/not-found");
 			return;
-
+		}
 	}
 }

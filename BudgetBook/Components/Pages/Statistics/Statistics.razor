@@ -1,0 +1,180 @@
+﻿@page "/statistics"
+
+@attribute [Authorize]
+@inject ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+
+<PageTitle>Statistics</PageTitle>
+
+<h1>Statistics</h1>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Total Income</h5>
+                <h3>@statistics.TotalIncome.ToString("C")</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Total Expenses</h5>
+                <h3>@statistics.TotalExpenses.ToString("C")</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Balance</h5>
+                <h3>@statistics.Balance.ToString("C")</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<h3>Expenses by Category</h3>
+
+@if (statistics.ExpensesByCategory.Count == 0)
+{
+    <p>No expenses found.</p>
+}
+else
+{
+    <table class="table table-striped mb-5">
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Amount</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var category in statistics.ExpensesByCategory)
+            {
+                <tr>
+                    <td>@category.CategoryName</td>
+                    <td>@category.Amount.ToString("C")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+
+<h3>Monthly Overview</h3>
+
+@if (statistics.ByMonth.Count == 0)
+{
+    <p>No transactions found.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Month</th>
+                <th>Income</th>
+                <th>Expenses</th>
+                <th>Balance</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var month in statistics.ByMonth)
+            {
+                <tr>
+                    <td>@month.Month.ToString("MMMM yyyy")</td>
+                    <td>@month.Income.ToString("C")</td>
+                    <td>@month.Expenses.ToString("C")</td>
+                    <td>@month.Balance.ToString("C")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+
+    private StatisticsViewModel? statistics;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (userId == null)
+            return;
+
+        // Get all transactions belonging to the logged-in user
+        var transactions = await DbContext.Transactions
+            .Where(t => t.UserId == userId)
+            .Include(t => t.Category)
+            .ToListAsync();
+
+        statistics = new StatisticsViewModel();
+
+        // Total income
+        statistics.TotalIncome = transactions
+            .Where(t => t.Type == TransactionType.Income)
+            .Sum(t => t.Amount);
+
+        // Total expenses
+        statistics.TotalExpenses = transactions
+            .Where(t => t.Type == TransactionType.Expense)
+            .Sum(t => t.Amount);
+
+        // Balance
+        statistics.Balance =
+            statistics.TotalIncome - statistics.TotalExpenses;
+
+        // Expenses grouped by category
+        statistics.ExpensesByCategory = transactions
+            .Where(t => t.Type == TransactionType.Expense)
+            .GroupBy(t => t.Category.Name)
+            .Select(g => new CategoryExpenseViewModel
+            {
+                CategoryName = g.Key,
+                Amount = g.Sum(t => t.Amount)
+            })
+            .ToList();
+
+        // Monthly statistics
+        statistics.ByMonth = transactions
+            .GroupBy(t => new
+            {
+                Year = t.BookingDate.Year,
+                Month = t.BookingDate.Month
+            })
+            .OrderByDescending(g => g.Key.Year)
+            .ThenByDescending(g => g.Key.Month)
+            .Select(g => new MonthlyStatisticsViewModel
+            {
+                Month = new DateTime(g.Key.Year, g.Key.Month, 1),
+
+                Income = g
+                    .Where(t => t.Type == TransactionType.Income)
+                    .Sum(t => t.Amount),
+
+                Expenses = g
+                    .Where(t => t.Type == TransactionType.Expense)
+                    .Sum(t => t.Amount),
+
+                Balance =
+                    g.Where(t => t.Type == TransactionType.Income)
+                        .Sum(t => t.Amount)
+                    -
+                    g.Where(t => t.Type == TransactionType.Expense)
+                        .Sum(t => t.Amount)
+            })
+            .ToList();
+    }
+}

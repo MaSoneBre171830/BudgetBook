@@ -17,6 +17,7 @@
 			<th>Type </th>
 			<th>Amount </th
 			<th>Actions</th>
+			<th > <a href="/transactions/create"><button class="button">Create</button></a></th>
 		</tr>
 	</thead>
 
@@ -30,6 +31,7 @@
 				<td>@transaction.Category.Name </td>
 				<td>@transaction.Type </td>
 				<td>@transaction.Amount </td>
+				
 				<td > <a href="/transactions/edit/@transaction.Id"><button class="button">Edit</button></a></td>
 				<td > <button @onclick="() => transactionToDelete = transaction" class="button">Delete</button></td>
 				<td > <a href="/transactions/details/@transaction.Id"><button class="button">Details</button></a></td>
